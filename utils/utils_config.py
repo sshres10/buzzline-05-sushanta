@@ -40,14 +40,14 @@ load_dotenv()
 
 def get_zookeeper_address() -> str:
     """Fetch ZOOKEEPER_ADDRESS from environment or use default."""
-    address = os.getenv("ZOOKEEPER_ADDRESS", "127.0.0.1:2181")
+    address = os.getenv("ZOOKEEPER_ADDRESS", "Localhost:2181")
     logger.info(f"ZOOKEEPER_ADDRESS: {address}")
     return address
 
 
 def get_kafka_broker_address() -> str:
     """Fetch KAFKA_BROKER_ADDRESS from environment or use default."""
-    address = os.getenv("KAFKA_BROKER_ADDRESS", "127.0.0.1:9092")
+    address = os.getenv("KAFKA_BROKER_ADDRESS", "Localhost:9092")
     logger.info(f"KAFKA_BROKER_ADDRESS: {address}")
     return address
 
@@ -158,6 +158,10 @@ def get_mongodb_collection() -> str:
     collection = os.getenv("MONGODB_COLLECTION", "mongo_buzz_collection")
     logger.info(f"MONGODB_COLLECTION: {collection}")
     return collection
+
+
+
+
 
 
 #####################################
