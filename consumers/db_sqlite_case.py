@@ -1,140 +1,128 @@
-""" db_sqlite_case.py 
+"""
+db_sqlite_case.py
 
-Has the following functions:
-- init_db(config): Initialize the SQLite database and create the 'streamed_messages' table if it doesn't exist.
-- insert_message(message, config): Insert a single processed message into the SQLite database.
+Handles SQLite database operations:
+- Initializes the database
+- Inserts processed messages
+- Deletes messages
 
-Example JSON message
+Example JSON message:
 {
-    "message": "I just shared a meme! It was amazing.",
-    "author": "Charlie",
-    "timestamp": "2025-01-29 14:35:20",
-    "category": "humor",
-    "sentiment": 0.87,
-    "keyword_mentioned": "meme",
-    "message_length": 42
+    "message": "I have a dream.",
+    "author": "Martin Luther King Jr.",
+    "timestamp": "1963-08-28 15:00:00",
+    "category": "civil rights",
+    "keyword_mentioned": "dream",
+    "message_length": 15
 }
-
 """
 
 #####################################
 # Import Modules
 #####################################
 
-# import from standard library
 import os
 import pathlib
 import sqlite3
-
-# import from local modules
 import utils.utils_config as config
 from utils.utils_logger import logger
 
 #####################################
-# Define Function to Initialize SQLite Database
+# Function to Initialize SQLite Database
 #####################################
-
 
 def init_db(db_path: pathlib.Path):
     """
-    Initialize the SQLite database -
-    if it doesn't exist, create the 'streamed_messages' table
-    and if it does, recreate it.
+    Initialize the SQLite database by creating the 'streamed_messages' table
+    without the 'sentiment' column.
 
     Args:
     - db_path (pathlib.Path): Path to the SQLite database file.
-
     """
-    logger.info("Calling SQLite init_db() with {db_path=}.")
+    logger.info(f"Calling SQLite init_db() with {db_path=}.")
+    
     try:
-        # Ensure the directories for the db exist
+        # Ensure the directories exist
         os.makedirs(os.path.dirname(db_path), exist_ok=True)
 
         with sqlite3.connect(db_path) as conn:
             cursor = conn.cursor()
             logger.info("SUCCESS: Got a cursor to execute SQL.")
 
+            # Drop the existing table if it exists
             cursor.execute("DROP TABLE IF EXISTS streamed_messages;")
 
-            cursor.execute(
-                """
+            # Create a new table without the 'sentiment' column
+            cursor.execute("""
                 CREATE TABLE IF NOT EXISTS streamed_messages (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     message TEXT,
                     author TEXT,
                     timestamp TEXT,
                     category TEXT,
-                    sentiment REAL,
                     keyword_mentioned TEXT,
-                    message_length INTEGER
+                    message_length INTEGER,
+                    length_category TEXT
                 )
-            """
-            )
+            """)
+
             conn.commit()
         logger.info(f"SUCCESS: Database initialized and table ready at {db_path}.")
     except Exception as e:
-        logger.error(f"ERROR: Failed to initialize a sqlite database at {db_path}: {e}")
-
+        logger.error(f"ERROR: Failed to initialize SQLite database at {db_path}: {e}")
 
 #####################################
-# Define Function to Insert a Processed Message into the Database
+# Function to Insert a Processed Message
 #####################################
-
 
 def insert_message(message: dict, db_path: pathlib.Path) -> None:
     """
-    Insert a single processed message into the SQLite database.
+    Insert a processed message into the SQLite database.
 
     Args:
-    - message (dict): Processed message to insert.
+    - message (dict): The processed message to insert.
     - db_path (pathlib.Path): Path to the SQLite database file.
     """
     logger.info("Calling SQLite insert_message() with:")
     logger.info(f"{message=}")
     logger.info(f"{db_path=}")
 
-    STR_PATH = str(db_path)
     try:
-        with sqlite3.connect(STR_PATH) as conn:
+        with sqlite3.connect(db_path) as conn:
             cursor = conn.cursor()
-            cursor.execute(
-                """
+            cursor.execute("""
                 INSERT INTO streamed_messages (
-                    message, author, timestamp, category, sentiment, keyword_mentioned, message_length
+                    message, author, timestamp, category, keyword_mentioned, message_length, length_category
                 ) VALUES (?, ?, ?, ?, ?, ?, ?)
-            """,
-                (
-                    message["message"],
-                    message["author"],
-                    message["timestamp"],
-                    message["category"],
-                    message["sentiment"],
-                    message["keyword_mentioned"],
-                    message["message_length"],
-                ),
-            )
+            """, (
+                message["message"],
+                message["author"],
+                message["timestamp"],
+                message["category"],
+                message["keyword_mentioned"],
+                message["message_length"],
+                message["length_category"]
+            ))
+
             conn.commit()
         logger.info("Inserted one message into the database.")
     except Exception as e:
         logger.error(f"ERROR: Failed to insert message into the database: {e}")
 
-
 #####################################
-# Define Function to Delete a Message from the Database
+# Function to Delete a Message by ID
 #####################################
-
 
 def delete_message(message_id: int, db_path: pathlib.Path) -> None:
     """
-    Delete a message from the SQLite database by its ID.
+    Delete a message from the SQLite database using its ID.
 
     Args:
-    - message_id (int): ID of the message to delete.
+    - message_id (int): The ID of the message to delete.
     - db_path (pathlib.Path): Path to the SQLite database file.
     """
-    STR_PATH = str(db_path)
     try:
-        with sqlite3.connect(STR_PATH) as conn:
+        with sqlite3.connect(db_path) as conn:
             cursor = conn.cursor()
             cursor.execute("DELETE FROM streamed_messages WHERE id = ?", (message_id,))
             conn.commit()
@@ -142,34 +130,36 @@ def delete_message(message_id: int, db_path: pathlib.Path) -> None:
     except Exception as e:
         logger.error(f"ERROR: Failed to delete message from the database: {e}")
 
+#####################################
+# Testing Functions (Main)
+#####################################
 
-#####################################
-# Define main() function for testing
-#####################################
 def main():
-    logger.info("Starting db testing.")
+    logger.info("Starting database testing.")
 
-    # Use config to make a path to a parallel test database
-    DATA_PATH: pathlib.path = config.get_base_data_path
-    TEST_DB_PATH: pathlib.Path = DATA_PATH / "test_buzz.sqlite"
+    # Define the path to the test database
+    DATA_PATH = config.get_base_data_path()
+    TEST_DB_PATH = DATA_PATH / "test_buzz.sqlite"
 
-    # Initialize the SQLite database by passing in the path
+    # Initialize the database
     init_db(TEST_DB_PATH)
     logger.info(f"Initialized database file at {TEST_DB_PATH}.")
 
+    # Test message
     test_message = {
-        "message": "I just shared a meme! It was amazing.",
-        "author": "Charlie",
-        "timestamp": "2025-01-29 14:35:20",
-        "category": "humor",
-        "sentiment": 0.87,
-        "keyword_mentioned": "meme",
-        "message_length": 42,
+        "message": "I have a dream.",
+        "author": "Martin Luther King Jr.",
+        "timestamp": "1963-08-28 15:00:00",
+        "category": "civil rights",
+        "keyword_mentioned": "dream",
+        "message_length": 15,
+        "length_category": "Short"
     }
 
+    # Insert test message
     insert_message(test_message, TEST_DB_PATH)
 
-    # Retrieve the ID of the inserted test message
+    # Retrieve the ID of the inserted message
     try:
         with sqlite3.connect(TEST_DB_PATH, timeout=1.0) as conn:
             cursor = conn.cursor()
@@ -180,7 +170,7 @@ def main():
             row = cursor.fetchone()
             if row:
                 test_message_id = row[0]
-                # Delete the test message
+                # Delete test message
                 delete_message(test_message_id, TEST_DB_PATH)
             else:
                 logger.warning("Test message not found; nothing to delete.")
@@ -189,9 +179,8 @@ def main():
 
     logger.info("Finished testing.")
 
-
-# #####################################
-# Conditional Execution
+#####################################
+# Execute main() for testing
 #####################################
 
 if __name__ == "__main__":
